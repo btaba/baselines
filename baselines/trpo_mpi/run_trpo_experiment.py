@@ -6,6 +6,9 @@ import os
 import time
 import json
 import subprocess
+from functools import partial
+from concurrent.futures import ProcessPoolExecutor
+from baselines.bench.monitor import load_results
 from baselines.bench.benchmarks import _BENCHMARKS
 
 
@@ -25,6 +28,36 @@ def train_mujoco(env_id, num_timesteps, seed, logdir):
 
 def train_atari(env_id, num_timesteps, seed):
     pass
+
+
+def train(base_log_path, benchmark_name, task):
+    results = []
+    for trial in range(task['trials']):
+        trial_logdir = os.path.join(
+            base_log_path,
+            '{}_{}_{}'.format(benchmark_name, task['env_id'], trial))
+        os.makedirs(trial_logdir)
+
+        if benchmark_name.lower().startswith('mujoco'):
+            train_mujoco(
+                task['env_id'],
+                num_timesteps=task['num_timesteps'],
+                seed=SEEDS[trial],
+                logdir=trial_logdir)
+        else:
+            train_atari(
+                task['env_id'],
+                num_timesteps=task['num_timesteps'],
+                seed=SEEDS[trial],
+                logdir=trial_logdir)
+
+        res = load_results(trial_logdir)
+        res['trial'] = trial
+        res['seed'] = SEEDS[trial]
+
+        results.append(res)
+
+    return results
 
 
 def main():
@@ -54,32 +87,16 @@ def main():
     os.makedirs(base_log_path)
 
     # train all the benchmark tasks
-    for task in benchmark['tasks']:
-        for trial in range(task['trials']):
-            trial_logdir = os.path.join(
-                base_log_path,
-                '{}_{}_{}'.format(benchmark_name, task['env_id'], trial))
-            os.makedirs(trial_logdir)
+    with ProcessPoolExecutor() as ex:
+        train_func = partial(train, base_log_path, benchmark_name)
+        for res in ex.map(
+                train_func,
+                benchmark['tasks']):
 
-            if benchmark_name.lower().startswith('mujoco'):
-                train_mujoco(
-                    task['env_id'],
-                    num_timesteps=3,
-                    seed=SEEDS[trial],
-                    logdir=trial_logdir)
-            else:
-                train_atari(
-                    task['env_id'],
-                    num_timesteps=task['num_timesteps'],
-                    seed=SEEDS[trial],
-                    logdir=trial_logdir)
-
-            from baselines.bench.monitor import load_results
-            res = load_results(trial_logdir)
-            res['trial'] = trial
-            res['seed'] = SEEDS[trial]
-
-            json.dump(res, open(os.path.join(base_log_path, 'logs.json'), 'a'))
+            for r in res:
+                f = open(os.path.join(base_log_path, 'logs.json'), 'a')
+                json.dump(r, f)
+                f.write('\n')
 
 
 if __name__ == '__main__':
