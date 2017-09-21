@@ -3,6 +3,7 @@
 # Mujoco must come before other imports. https://openai.slack.com/archives/C1H6P3R7B/p1492828680631850
 
 import os
+import sys
 import time
 import json
 import subprocess
@@ -20,8 +21,9 @@ def train_mujoco(env_id, num_timesteps, seed, logdir):
     env = os.environ.copy()
     env["PATH"] = "/usr/sbin:/sbin:" + env["PATH"]
     env["OPENAI_LOGDIR"] = logdir
-    command = '/Applications/anaconda/envs/yarlp/bin/python -m baselines.trpo_mpi.run_mujoco --env {} --seed {} --num-timesteps {}'.format(
-        env_id, seed, num_timesteps)
+    python_path = sys.executable
+    command = '{} -m baselines.trpo_mpi.run_mujoco --env {} --seed {} --num-timesteps {}'.format(
+        python_path, env_id, seed, num_timesteps)
     p = subprocess.Popen(command, env=env, shell=True)
     out, err = p.communicate()
 
