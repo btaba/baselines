@@ -13,7 +13,7 @@ from baselines.bench.monitor import load_results
 from baselines.bench.benchmarks import _BENCHMARKS
 
 
-SEEDS = list(range(100))
+SEEDS = list(range(1, 100))
 
 
 def train_mujoco(env_id, num_timesteps, seed, logdir):
