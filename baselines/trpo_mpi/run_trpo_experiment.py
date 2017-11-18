@@ -84,8 +84,9 @@ def main():
     benchmark = _BENCHMARKS[benchmark_idx]
 
     # Make a master log directory
-    path = time.strftime("{}_%d-%m-%y-%H-%M-%S".format(benchmark_name))
-    base_log_path = os.path.join(logdir, path)
+    path = time.strftime("{}_%d-%m-%y-%H-%M-%S_baseline".format(
+        benchmark_name))
+    base_log_path = os.path.join(os.path.expanduser(logdir), path)
     os.makedirs(base_log_path)
 
     # train all the benchmark tasks
@@ -96,9 +97,10 @@ def main():
                 benchmark['tasks']):
 
             for r in res:
-                f = open(os.path.join(base_log_path, 'logs.json'), 'a')
-                json.dump(r, f)
-                f.write('\n')
+                # f = open(os.path.join(base_log_path, 'logs.json'), 'a')
+                # json.dump(r, f)
+                # f.write('\n')
+                print(r)
 
 
 if __name__ == '__main__':
