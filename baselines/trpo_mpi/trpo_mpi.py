@@ -213,10 +213,16 @@ def learn(env, policy_func, *,
             return allmean(compute_fvp(p, *fvpargs)) + cg_damping * p
 
         assign_old_eq_new() # set old parameter values to new parameter values
+
+        for v in var_list:
+            print(v, U.function([], v)().std())
+            print(v, U.function([], v)().mean())
+
         with timed("computegrad"):
             *lossbefore, g = compute_lossandgrad(*args)
         lossbefore = allmean(np.array(lossbefore))
         g = allmean(g)
+        print(g)
         if np.allclose(g, 0):
             logger.log("Got zero gradient. not updating")
         else:
