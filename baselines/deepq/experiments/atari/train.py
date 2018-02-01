@@ -22,9 +22,10 @@ from baselines.common.misc_util import (
 )
 from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
 from baselines import bench
-from baselines.common.atari_wrappers import wrap_deepmind as wrap_dqn
-# from baselines.common.azure_utils import Container
-from model import model, dueling_model
+from baselines.common.atari_wrappers_deprecated import wrap_dqn
+from baselines.common.azure_utils import Container
+from .model import model, dueling_model
+from baselines.deepq.utils import Uint8Input, load_state, save_state
 
 
 def parse_args():
@@ -57,7 +58,6 @@ def parse_args():
                         help="It present data will saved/loaded from Azure. Should be in format ACCOUNT_NAME:ACCOUNT_KEY:CONTAINER")
     parser.add_argument("--save-freq", type=int, default=1e6, help="save model once every time this many iterations are completed")
     boolean_flag(parser, "load-on-start", default=True, help="if true and model was previously saved then training will be resumed")
-    print(parser.parse_args())
     return parser.parse_args()
 
 
@@ -80,9 +80,9 @@ def maybe_save_model(savedir, container, state):
     relatively_safe_pickle_dump(state, os.path.join(savedir, 'training_state.pkl.zip'), compression=True)
     if container is not None:
         container.put(os.path.join(savedir, 'training_state.pkl.zip'), 'training_state.pkl.zip')
-    # relatively_safe_pickle_dump(state["monitor_state"], os.path.join(savedir, 'monitor_state.pkl'))
-    # if container is not None:
-    #     container.put(os.path.join(savedir, 'monitor_state.pkl'), 'monitor_state.pkl')
+    relatively_safe_pickle_dump(state["monitor_state"], os.path.join(savedir, 'monitor_state.pkl'))
+    if container is not None:
+        container.put(os.path.join(savedir, 'monitor_state.pkl'), 'monitor_state.pkl')
     logger.log("Saved model in {} seconds\n".format(time.time() - start_time))
 
 
@@ -175,7 +175,7 @@ if __name__ == '__main__':
         state = maybe_load_model(savedir, container)
         if state is not None:
             num_iters, replay_buffer = state["num_iters"], state["replay_buffer"],
-            # monitored_env.set_state(state["monitor_state"])
+            monitored_env.set_state(state["monitor_state"])
 
         start_time, start_steps = None, None
         steps_per_iter = RunningAvg(0.999)
@@ -183,10 +183,6 @@ if __name__ == '__main__':
         obs = env.reset()
         num_iters_since_reset = 0
         reset = True
-        from collections import deque
-        info_rewards = deque(maxlen=100)
-        total_steps = 0
-        episode_reward = 0
 
         # Main trianing loop
         while True:
@@ -216,12 +212,6 @@ if __name__ == '__main__':
             action = act(np.array(obs)[None], update_eps=update_eps, **kwargs)[0]
             reset = False
             new_obs, rew, done, info = env.step(action)
-            total_steps += 1
-            episode_reward += rew
-            if done:
-                info_rewards.append(episode_reward)
-                episode_reward = 0
-            info["steps"] = total_steps
             replay_buffer.add(obs, action, rew, new_obs, float(done))
             obs = new_obs
             if done:
@@ -249,16 +239,16 @@ if __name__ == '__main__':
                 update_target()
 
             if start_time is not None:
-                steps_per_iter.update(total_steps - start_steps)
+                steps_per_iter.update(info['steps'] - start_steps)
                 iteration_time_est.update(time.time() - start_time)
-            start_time, start_steps = time.time(), total_steps
+            start_time, start_steps = time.time(), info["steps"]
 
             # Save the model and training state.
-            if num_iters > 0 and (num_iters % args.save_freq == 0 or total_steps > args.num_steps):
+            if num_iters > 0 and (num_iters % args.save_freq == 0 or info["steps"] > args.num_steps):
                 maybe_save_model(savedir, container, {
                     'replay_buffer': replay_buffer,
                     'num_iters': num_iters,
-                    # 'monitor_state': monitored_env.get_state(),
+                    'monitor_state': monitored_env.get_state(),
                 })
 
             if info["steps"] > args.num_steps:
@@ -271,8 +261,8 @@ if __name__ == '__main__':
                 logger.record_tabular("% completion", completion)
                 logger.record_tabular("steps", info["steps"])
                 logger.record_tabular("iters", num_iters)
-                # logger.record_tabular("episodes", len(info["rewards"]))
-                logger.record_tabular("reward (100 epi mean)", np.mean(info_rewards))
+                logger.record_tabular("episodes", len(info["rewards"]))
+                logger.record_tabular("reward (100 epi mean)", np.mean(info["rewards"][-100:]))
                 logger.record_tabular("exploration", exploration.value(num_iters))
                 if args.prioritized:
                     logger.record_tabular("max priority", replay_buffer._max_priority)
