@@ -23,7 +23,9 @@ from baselines.common.misc_util import (
 )
 from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
 # from baselines import bench
-from baselines.common.atari_wrappers_deprecated import wrap_dqn
+# from baselines.common.atari_wrappers_deprecated import wrap_dqn
+from baselines.common.atari_wrappers import wrap_deepmind as wrap_dqn
+from baselines.common.atari_wrappers import make_atari
 # from baselines.common.azure_utils import Container
 from model import model, dueling_model
 from baselines.deepq.utils import Uint8Input, load_state, save_state
@@ -63,9 +65,9 @@ def parse_args():
 
 
 def make_env(game_name):
-    env = gym.make(game_name + "NoFrameskip-v4")
-    # monitored_env = bench.Monitor(env, logger.get_dir())  # puts rewards and number of steps in info, before environment is wrapped
-    monitored_env = SimpleMonitor(env)
+    # env = gym.make(game_name + "NoFrameskip-v4")
+    env = make_atari(game_name + "NoFrameskip-v4")
+    monitored_env = SimpleMonitor(env)  # puts rewards and number of steps in info, before environment is wrapped
     env = wrap_dqn(monitored_env)  # applies a bunch of modification to simplify the observation space (downsample, make b/w)
     return env, monitored_env
 
