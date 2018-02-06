@@ -19,12 +19,13 @@ from baselines.common.misc_util import (
     relatively_safe_pickle_dump,
     set_global_seeds,
     RunningAvg,
+    SimpleMonitor
 )
 from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
-from baselines import bench
+# from baselines import bench
 from baselines.common.atari_wrappers_deprecated import wrap_dqn
-from baselines.common.azure_utils import Container
-from .model import model, dueling_model
+# from baselines.common.azure_utils import Container
+from model import model, dueling_model
 from baselines.deepq.utils import Uint8Input, load_state, save_state
 
 
@@ -63,7 +64,8 @@ def parse_args():
 
 def make_env(game_name):
     env = gym.make(game_name + "NoFrameskip-v4")
-    monitored_env = bench.Monitor(env, logger.get_dir())  # puts rewards and number of steps in info, before environment is wrapped
+    # monitored_env = bench.Monitor(env, logger.get_dir())  # puts rewards and number of steps in info, before environment is wrapped
+    monitored_env = SimpleMonitor(env)
     env = wrap_dqn(monitored_env)  # applies a bunch of modification to simplify the observation space (downsample, make b/w)
     return env, monitored_env
 
@@ -114,17 +116,17 @@ if __name__ == '__main__':
     savedir = args.save_dir
     if savedir is None:
         savedir = os.getenv('OPENAI_LOGDIR', None)
-    if args.save_azure_container is not None:
-        account_name, account_key, container_name = args.save_azure_container.split(":")
-        container = Container(account_name=account_name,
-                              account_key=account_key,
-                              container_name=container_name,
-                              maybe_create=True)
-        if savedir is None:
-            # Careful! This will not get cleaned up. Docker spoils the developers.
-            savedir = tempfile.TemporaryDirectory().name
-    else:
-        container = None
+    # if args.save_azure_container is not None:
+    #     account_name, account_key, container_name = args.save_azure_container.split(":")
+    #     container = Container(account_name=account_name,
+    #                           account_key=account_key,
+    #                           container_name=container_name,
+    #                           maybe_create=True)
+    #     if savedir is None:
+    #         # Careful! This will not get cleaned up. Docker spoils the developers.
+    #         savedir = tempfile.TemporaryDirectory().name
+    # else:
+    container = None
     # Create and seed the env.
     env, monitored_env = make_env(args.env)
     if args.seed > 0:
@@ -142,7 +144,7 @@ if __name__ == '__main__':
         # Create training graph and replay buffer
         def model_wrapper(img_in, num_actions, scope, **kwargs):
             actual_model = dueling_model if args.dueling else model
-            return actual_model(img_in, num_actions, scope, layer_norm=args.layer_norm, **kwargs)
+            return actual_model(img_in, num_actions, scope, **kwargs)
         act, train, update_target, debug = deepq.build_train(
             make_obs_ph=lambda name: Uint8Input(env.observation_space.shape, name=name),
             q_func=model_wrapper,
