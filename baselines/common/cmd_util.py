@@ -6,7 +6,7 @@ import os
 import gym
 from baselines import logger
 from baselines.bench import Monitor
-from baselines.common import set_global_seeds
+from baselines.common.misc_util import set_global_seeds
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from mpi4py import MPI
